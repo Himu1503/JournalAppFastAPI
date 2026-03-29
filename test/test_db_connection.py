@@ -1,3 +1,5 @@
 from database import engine
 
-print(engine.connect())
+def test_db_connection():
+    with engine.connect() as connection:
+        assert connection is not None
