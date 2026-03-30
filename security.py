@@ -2,7 +2,7 @@ import base64
 import hashlib
 import hmac
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 import jwt
 
@@ -50,7 +50,7 @@ def verify_password(password: str, stored_hash: str) -> bool:
 
 
 def create_access_token(user_id: int) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expire = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": str(user_id),

@@ -1,7 +1,9 @@
-from fastapi import FastAPI,HTTPException
+import logging
+from time import perf_counter
+from uuid import uuid4
+from fastapi import FastAPI,HTTPException, Request
 from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
-from typing import List
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 import jwt
@@ -11,9 +13,31 @@ from models.user import Users
 from schemas import JournalEntryCreate, JournalEntryRead, UserCreate, UserRead, UserLogin, Token
 from security import create_access_token, decode_access_token, hash_password, verify_password
 
+from utils.logging import setup_logging
+setup_logging()
+logger = logging.getLogger(__name__)
+
 
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    request_id = str(uuid4())[:8]
+    start = perf_counter()
+    response = await call_next(request)
+    duration_ms = round((perf_counter() - start) * 1000, 2)
+    logger.info(
+        "request_id=%s method=%s path=%s status=%s duration_ms=%s",
+        request_id,
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+    )
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 Base.metadata.create_all(bind=engine)
 
@@ -43,11 +67,14 @@ def get_current_user(
         sub = payload.get("sub")
         user_id = int(sub)
     except (jwt.InvalidTokenError, ValueError, TypeError):
+        logger.warning("auth_failed reason=invalid_token")
         raise credentials_error
 
     user = db.query(Users).filter(Users.id == user_id).first()
     if not user:
+        logger.warning("auth_failed reason=user_not_found user_id=%s", user_id)
         raise credentials_error
+    logger.info("auth_success user_id=%s", user.id)
     return user
 
 @app.get("/")
@@ -70,6 +97,7 @@ async def JournalEntriesPost(
     db.add(db_entry)
     db.commit()
     db.refresh(db_entry)
+    logger.info("journal_created user_id=%s journal_id=%s", user_id, db_entry.id)
     return db_entry
 
 @app.get("/journal", response_model=list[JournalEntryRead])
@@ -113,6 +141,7 @@ async def createUser(user: UserCreate, db: Session = Depends(get_db)):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+    logger.info("user_created user_id=%s email=%s", db_user.id, db_user.email)
     return db_user
 
 
@@ -120,12 +149,14 @@ async def createUser(user: UserCreate, db: Session = Depends(get_db)):
 async def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
     user = db.query(Users).filter(Users.email == user_credentials.email).first()
     if not user or not verify_password(user_credentials.password, user.password):
+        logger.warning("login_failed email=%s", user_credentials.email)
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    logger.info("login_success user_id=%s", user.id)
     return {"access_token": create_access_token(user.id), "token_type": "bearer"}
 
 
 
-@app.get("/user", response_model = List[UserRead])
+@app.get("/user", response_model = list[UserRead])
 async def getUser(
     db:Session = Depends(get_db),
     current_user: Users = Depends(get_current_user),
