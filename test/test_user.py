@@ -1,5 +1,4 @@
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
 def test_create_user(client: TestClient):
     payload = {
@@ -16,8 +15,17 @@ def test_create_user(client: TestClient):
     assert data["journal_entries"] == []
 
 
-def test_get_user(client: TestClient, db: Session, seed_user):
-    response = client.get(f"/user/{seed_user.id}")
+def test_login_user(client: TestClient, seed_user):
+    payload = {"email": seed_user.email, "password": "secret"}
+    response = client.post("/auth/login", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+
+
+def test_get_user(client: TestClient, seed_user, auth_headers):
+    response = client.get(f"/user/{seed_user.id}", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["username"] == seed_user.username
