@@ -47,7 +47,7 @@ Create a `.env` file (or export variables in your shell):
 
 ```env
 JWT_SECRET_KEY=replace-with-a-long-random-secret
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/bloging_db
+DATABASE_URL=postgresql://<username>:<password>@<host>:<port>/<database_name>
 ```
 
 Notes:
