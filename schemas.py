@@ -3,7 +3,6 @@ from pydantic import BaseModel, ConfigDict
 class JournalEntryCreate(BaseModel):
     title: str
     content: str
-    user_id: int
 
 
 class JournalEntryRead(BaseModel):
@@ -17,7 +16,7 @@ class JournalEntryRead(BaseModel):
 
 class UserCreate(BaseModel):
     username: str
-    email: str
+    email: str | None = None
     password: str
     model_config = ConfigDict(from_attributes=True)
 

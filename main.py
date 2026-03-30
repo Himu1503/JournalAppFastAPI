@@ -32,12 +32,12 @@ def get_db():
 async def healthCheck():
     return {"message": "Hello World"}
 
-@app.post("/journal", response_model=JournalEntryRead)
-async def JournalEntriesPost(entry: JournalEntryCreate, db: Session = Depends(get_db)):
-    user = db.query(Users).filter(Users.id == entry.user_id).first()
+@app.post("/journal/{user_id}", response_model=JournalEntryRead)
+async def JournalEntriesPost(user_id: int, entry: JournalEntryCreate, db: Session = Depends(get_db)):
+    user = db.query(Users).filter(Users.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    db_entry = JournalEntries(**entry.model_dump())
+    db_entry = JournalEntries(**entry.model_dump(), user_id=user_id)
     db.add(db_entry)
     db.commit()
     db.refresh(db_entry)
@@ -67,7 +67,7 @@ async def getJournalEntryById(id:int , db:Session = Depends(get_db)):
 
 @app.post("/user" , response_model=UserRead)
 async def createUser(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = Users(**user.model_dump())
+    db_user = Users(**user.model_dump()) 
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
